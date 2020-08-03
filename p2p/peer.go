@@ -9,12 +9,7 @@ type peerConn struct {
 	ip         net.IP
 }
 
-func newPeerConn(
-	outbound bool,
-	conn net.Conn,
-	socketAddr *NetAddress,
-) peerConn {
-
+func newPeerConn(outbound bool, conn net.Conn, socketAddr *NetAddress) peerConn {
 	return peerConn{
 		outbound:   outbound,
 		conn:       conn,
