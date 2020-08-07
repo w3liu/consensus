@@ -1,6 +1,9 @@
 package p2p
 
-import "net"
+import (
+	"github.com/w3liu/consensus/p2p/conn"
+	"net"
+)
 
 type peerConn struct {
 	outbound   bool
@@ -17,9 +20,32 @@ func newPeerConn(outbound bool, conn net.Conn, socketAddr *NetAddress) peerConn 
 	}
 }
 
-func (pc peerConn) ID() ID {
-	return ""
+type peer struct {
+	peerConn
+	mconn    *conn.MConnection
+	nodeInfo NodeInfo
+	channels []byte
 }
 
-type peer struct {
+func newPeer(pc peerConn, nodeInfo NodeInfo) *peer {
+	return &peer{
+		peerConn: pc,
+		nodeInfo: nodeInfo,
+	}
+}
+
+func (p *peer) Send(chID byte, msgBytes []byte) bool {
+	if !p.hasChannel(chID) {
+		return false
+	}
+	return true
+}
+
+func (p *peer) hasChannel(chID byte) bool {
+	for _, ch := range p.channels {
+		if ch == chID {
+			return true
+		}
+	}
+	return false
 }
