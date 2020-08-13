@@ -1,6 +1,7 @@
 package p2p
 
 import (
+	"bufio"
 	"fmt"
 	"net"
 	"testing"
@@ -28,11 +29,13 @@ func TestDial(t *testing.T) {
 	defer conn.Close()
 	msg := []byte("hello world")
 
+	buffWriter := bufio.NewWriterSize(conn, 1024)
+
 	ticker := time.NewTicker(time.Second * 5)
 	for {
 		select {
 		case <-ticker.C:
-			_, err = conn.Write(msg)
+			_, err = buffWriter.Write(msg)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -51,9 +54,10 @@ func TestListen(t *testing.T) {
 			t.Fatal(err)
 		}
 		go func(c net.Conn) {
+			bufReader := bufio.NewReaderSize(c, 1024)
 			buf := make([]byte, 256)
 			for {
-				n, err := c.Read(buf)
+				n, err := bufReader.Read(buf)
 				if err != nil {
 					t.Fatal(err)
 				}

@@ -9,25 +9,28 @@ import (
 
 func NewReader(r io.Reader) ReadCloser {
 	var closer io.Closer
-	var buffer bytes.Buffer
 	if c, ok := r.(io.Closer); ok {
 		closer = c
 	}
 	return &gobReader{
 		r:      r,
-		buf:    &buffer,
+		buf:    make([]byte, 1024),
 		closer: closer,
 	}
 }
 
 type gobReader struct {
 	r      io.Reader
-	buf    *bytes.Buffer
+	buf    []byte
 	closer io.Closer
 }
 
 func (r *gobReader) ReadMsg(msg bean.Message) error {
-	dec := gob.NewDecoder(r.r)
+	n, err := io.ReadFull(r.r, r.buf)
+	if err != nil {
+		return err
+	}
+	dec := gob.NewDecoder(bytes.NewBuffer(r.buf[:n]))
 	return dec.Decode(msg)
 }
 

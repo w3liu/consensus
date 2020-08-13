@@ -1,7 +1,6 @@
 package gobio
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/gob"
 	"github.com/w3liu/consensus/bean"
@@ -33,14 +32,6 @@ func (w *gobWriter) WriteMsg(msg bean.Message) (int, error) {
 		return 0, err
 	}
 	n, err := w.w.Write(w.buf.Bytes())
-
-	if w, ok := w.w.(*bufio.Writer); ok {
-		err := w.Flush()
-		if err != nil {
-			return 0, err
-		}
-	}
-
 	defer w.buf.Reset()
 	return n, err
 }

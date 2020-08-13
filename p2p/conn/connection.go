@@ -1,6 +1,7 @@
 package conn
 
 import (
+	"bufio"
 	"fmt"
 	"github.com/w3liu/consensus/bean"
 	"github.com/w3liu/consensus/libs/gobio"
@@ -9,12 +10,13 @@ import (
 	"net"
 	"runtime/debug"
 	"sync"
+	"time"
 )
 
 type MConnection struct {
 	conn            net.Conn
-	bufConnReader   net.Conn
-	bufConnWriter   net.Conn
+	bufConnReader   *bufio.Reader
+	bufConnWriter   *bufio.Writer
 	send            chan struct{}
 	pong            chan struct{}
 	channels        []*Channel
@@ -40,8 +42,8 @@ func NewMConnection(
 ) *MConnection {
 	mconn := &MConnection{
 		conn:          conn,
-		bufConnReader: conn,
-		bufConnWriter: conn,
+		bufConnReader: bufio.NewReaderSize(conn, minReadBufferSize),
+		bufConnWriter: bufio.NewWriterSize(conn, minWriteBufferSize),
 		send:          make(chan struct{}, 1),
 		pong:          make(chan struct{}, 1),
 		onReceive:     onReceive,
@@ -76,11 +78,18 @@ func (c *MConnection) OnStop() {
 	}
 
 	c.conn.Close()
+}
 
-	// We can't close pong safely here because
-	// recvRoutine may write to it after we've stopped.
-	// Though it doesn't need to get closed at all,
-	// we close it @ recvRoutine.
+func (c *MConnection) flush() {
+	log.Println("Flush", "conn", c)
+	log.Println(111)
+	if c.bufConnWriter.Buffered() > 0 {
+		err := c.bufConnWriter.Flush()
+		if err != nil {
+			log.Println("MConnection flush failed", "err", err)
+		}
+	}
+	log.Println(222)
 }
 
 func (c *MConnection) stopServices() (alreadyStopped bool) {
@@ -89,14 +98,12 @@ func (c *MConnection) stopServices() (alreadyStopped bool) {
 
 	select {
 	case <-c.quitSendRoutine:
-		// already quit
 		return true
 	default:
 	}
 
 	select {
 	case <-c.quitRecvRoutine:
-		// already quit
 		return true
 	default:
 	}
@@ -119,12 +126,13 @@ func (c *MConnection) Send(chID byte, msgBytes []byte) bool {
 		default:
 		}
 	} else {
-		fmt.Println("Send failed", "channel", chID, "conn", c, "msgBytes", fmt.Sprintf("%X", msgBytes))
+		log.Println("Send failed", "channel", chID, "conn", c, "msgBytes", fmt.Sprintf("%X", msgBytes))
 	}
 	return success
 }
 
 func (c *MConnection) sendSomePacketMsgs() bool {
+	time.Sleep(time.Millisecond * 50)
 	for i := 0; i < numBatchPacketMsgs; i++ {
 		if c.sendPacketMsg() {
 			return true
@@ -142,7 +150,6 @@ func (c *MConnection) sendPacketMsg() bool {
 		}
 		leastChannel = channel
 	}
-
 	// Nothing to send?
 	if leastChannel == nil {
 		return true
@@ -150,8 +157,9 @@ func (c *MConnection) sendPacketMsg() bool {
 	// c.Logger.Info("Found a msgPacket to send")
 
 	_, err := leastChannel.writePacketMsgTo(c.bufConnWriter)
+	defer c.flush()
 	if err != nil {
-		log.Println(err.Error())
+		log.Println("writePacketMsgTo error", err.Error())
 		return true
 	}
 	return false
