@@ -1,6 +1,9 @@
 package crypto
 
-import "github.com/w3liu/consensus/libs/bytes"
+import (
+	"github.com/w3liu/consensus/crypto/tmhash"
+	"github.com/w3liu/consensus/libs/bytes"
+)
 
 const (
 	// AddressSize is the size of a pubkey address.

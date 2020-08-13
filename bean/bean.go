@@ -1,7 +1,14 @@
 package bean
 
 type PacketMsg struct {
-	ChannelID int32  `json:"channelId"`
-	EOF       int32  `json:"eof"`
-	Data      []byte `json:"data"`
+	ChannelID int32
+	EOF       int32
+	Data      []byte
+}
+
+func (m *PacketMsg) GetData() []byte {
+	if m != nil {
+		return m.Data
+	}
+	return nil
 }

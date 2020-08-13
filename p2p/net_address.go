@@ -1,6 +1,7 @@
 package p2p
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"net"
@@ -69,4 +70,25 @@ func NewNetAddressString(addr string) (*NetAddress, error) {
 	na := NewNetAddressIPPort(ip, uint16(port))
 	na.ID = id
 	return na, nil
+}
+
+func NewNetAddressIPPort(ip net.IP, port uint16) *NetAddress {
+	return &NetAddress{
+		IP:   ip,
+		Port: port,
+	}
+}
+
+func validateID(id ID) error {
+	if len(id) == 0 {
+		return errors.New("no ID")
+	}
+	idBytes, err := hex.DecodeString(string(id))
+	if err != nil {
+		return err
+	}
+	if len(idBytes) != IDByteLength {
+		return fmt.Errorf("invalid hex length - got %d, expected %d", len(idBytes), IDByteLength)
+	}
+	return nil
 }
