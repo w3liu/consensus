@@ -3,9 +3,9 @@ package conn
 import (
 	"bufio"
 	"fmt"
-	"github.com/w3liu/consensus/bean"
 	"github.com/w3liu/consensus/libs/gobio"
 	"github.com/w3liu/consensus/libs/timer"
+	"github.com/w3liu/consensus/types"
 	"io"
 	"log"
 	"net"
@@ -185,7 +185,7 @@ func (c *MConnection) recvRoutine() {
 	reader := gobio.NewReader(c.conn)
 FOR_LOOP:
 	for {
-		var packet bean.PacketMsg
+		var packet types.PacketMsg
 		err := reader.ReadMsg(&packet)
 		if err != nil {
 			select {

@@ -2,9 +2,9 @@ package conn
 
 import (
 	"fmt"
-	"github.com/w3liu/consensus/bean"
 	"github.com/w3liu/consensus/libs/gobio"
 	clmath "github.com/w3liu/consensus/libs/math"
+	"github.com/w3liu/consensus/types"
 	"io"
 	"log"
 	"sync/atomic"
@@ -101,8 +101,8 @@ func (ch *Channel) isSendPending() bool {
 	return true
 }
 
-func (ch *Channel) nextPacketMsg() bean.PacketMsg {
-	packet := bean.PacketMsg{ChannelID: int32(ch.desc.ID)}
+func (ch *Channel) nextPacketMsg() types.PacketMsg {
+	packet := types.PacketMsg{ChannelID: int32(ch.desc.ID)}
 	maxSize := ch.maxPacketMsgPayloadSize
 	packet.Data = ch.sending[:clmath.MinInt(maxSize, len(ch.sending))]
 	if len(ch.sending) <= maxSize {
@@ -124,7 +124,7 @@ func (ch *Channel) writePacketMsgTo(w io.Writer) (n int, err error) {
 	return
 }
 
-func (ch *Channel) recvPacketMsg(packet bean.PacketMsg) ([]byte, error) {
+func (ch *Channel) recvPacketMsg(packet types.PacketMsg) ([]byte, error) {
 	var recvCap, recvReceived = ch.desc.RecvMessageCapacity, len(ch.recving) + len(packet.Data)
 	if recvCap < recvReceived {
 		return nil, fmt.Errorf("received message exceeds available capacity: %v < %v", recvCap, recvReceived)

@@ -3,7 +3,7 @@ package gobio
 import (
 	"bytes"
 	"encoding/gob"
-	"github.com/w3liu/consensus/bean"
+	"github.com/w3liu/consensus/types"
 	"io"
 )
 
@@ -26,7 +26,7 @@ type gobWriter struct {
 	closer io.Closer
 }
 
-func (w *gobWriter) WriteMsg(msg bean.Message) (int, error) {
+func (w *gobWriter) WriteMsg(msg types.Message) (int, error) {
 	enc := gob.NewEncoder(w.buf)
 	if err := enc.Encode(msg); err != nil {
 		return 0, err

@@ -1,12 +1,12 @@
 package gobio
 
 import (
-	"github.com/w3liu/consensus/bean"
+	"github.com/w3liu/consensus/types"
 	"io"
 )
 
 type Writer interface {
-	WriteMsg(bean.Message) (int, error)
+	WriteMsg(types.Message) (int, error)
 }
 
 type WriteCloser interface {
@@ -15,7 +15,7 @@ type WriteCloser interface {
 }
 
 type Reader interface {
-	ReadMsg(bean.Message) error
+	ReadMsg(types.Message) error
 }
 
 type ReadCloser interface {

@@ -1,4 +1,4 @@
-package bean
+package types
 
 type PacketMsg struct {
 	ChannelID int32
