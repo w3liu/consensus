@@ -26,7 +26,7 @@ type gobReader struct {
 }
 
 func (r *gobReader) ReadMsg(msg bean.Message) error {
-	n, err := io.ReadFull(r.r, r.buf)
+	n, err := r.r.Read(r.buf)
 	if err != nil {
 		return err
 	}

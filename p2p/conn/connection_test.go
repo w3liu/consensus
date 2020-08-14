@@ -1,6 +1,8 @@
 package conn
 
 import (
+	"bytes"
+	"encoding/binary"
 	"fmt"
 	"net"
 	"testing"
@@ -50,11 +52,13 @@ func TestMConnectionReceive(t *testing.T) {
 
 	msg := "hello"
 
-	for i := 0; i < 5; i++ {
-		txt := fmt.Sprintf("%s_%d", msg, i)
-		serverConn.Send(0x01, []byte(txt))
-		time.Sleep(time.Second)
-	}
+	go func() {
+		for i := 0; i < 100; i++ {
+			txt := fmt.Sprintf("%s_%d", msg, i)
+			serverConn.Send(0x01, []byte(txt))
+		}
+	}()
+
 	for {
 		select {
 		case receivedBytes := <-receivedCh:
@@ -71,7 +75,7 @@ func TestMConnectionReceive(t *testing.T) {
 func TestPipe(t *testing.T) {
 	server, client := net.Pipe()
 
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 100; i++ {
 		go func() {
 			_, err := server.Write([]byte("hello"))
 			if err != nil {
@@ -88,8 +92,27 @@ func TestPipe(t *testing.T) {
 		}
 		fmt.Println(string(buf[:n]))
 		i++
-		if i >= 9 {
+		if i >= 100 {
 			break
 		}
 	}
+}
+
+func TestPutUvarint(t *testing.T) {
+	buf := make([]byte, 10)
+	lenOff := binary.PutUvarint(buf, 1244567789)
+
+	fmt.Println(lenOff)
+
+	buffer := &bytes.Buffer{}
+
+	buffer.Write(buf[:lenOff])
+	buffer.Write([]byte{1, 2, 3})
+
+	i, err := binary.ReadUvarint(buffer)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	fmt.Println("i", i, "buffer", buffer.Bytes())
 }

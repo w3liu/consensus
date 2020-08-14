@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"github.com/w3liu/consensus/bean"
 	"github.com/w3liu/consensus/libs/gobio"
+	"github.com/w3liu/consensus/libs/timer"
 	"io"
 	"log"
 	"net"
 	"runtime/debug"
 	"sync"
-	"time"
 )
 
 type MConnection struct {
@@ -28,6 +28,7 @@ type MConnection struct {
 	doneSendRoutine chan struct{}
 	quitRecvRoutine chan struct{}
 	stopMtx         sync.Mutex
+	flushTimer      *timer.ThrottleTimer
 }
 
 type receiveCbFunc func(chID byte, msgBytes []byte)
@@ -64,6 +65,7 @@ func NewMConnection(
 }
 
 func (c *MConnection) OnStart() error {
+	c.flushTimer = timer.NewThrottleTimer("flush", defaultFlushThrottle)
 	c.quitSendRoutine = make(chan struct{})
 	c.doneSendRoutine = make(chan struct{})
 	c.quitRecvRoutine = make(chan struct{})
@@ -76,20 +78,14 @@ func (c *MConnection) OnStop() {
 	if c.stopServices() {
 		return
 	}
-
 	c.conn.Close()
 }
 
 func (c *MConnection) flush() {
-	log.Println("Flush", "conn", c)
-	log.Println(111)
-	if c.bufConnWriter.Buffered() > 0 {
-		err := c.bufConnWriter.Flush()
-		if err != nil {
-			log.Println("MConnection flush failed", "err", err)
-		}
+	err := c.bufConnWriter.Flush()
+	if err != nil {
+		log.Println("MConnection flush failed", "err", err)
 	}
-	log.Println(222)
 }
 
 func (c *MConnection) stopServices() (alreadyStopped bool) {
@@ -132,7 +128,6 @@ func (c *MConnection) Send(chID byte, msgBytes []byte) bool {
 }
 
 func (c *MConnection) sendSomePacketMsgs() bool {
-	time.Sleep(time.Millisecond * 50)
 	for i := 0; i < numBatchPacketMsgs; i++ {
 		if c.sendPacketMsg() {
 			return true
@@ -155,13 +150,12 @@ func (c *MConnection) sendPacketMsg() bool {
 		return true
 	}
 	// c.Logger.Info("Found a msgPacket to send")
-
 	_, err := leastChannel.writePacketMsgTo(c.bufConnWriter)
-	defer c.flush()
 	if err != nil {
 		log.Println("writePacketMsgTo error", err.Error())
 		return true
 	}
+	c.flush()
 	return false
 }
 
@@ -169,6 +163,10 @@ func (c *MConnection) sendRoutine() {
 	defer c._recover()
 	for {
 		select {
+		case <-c.flushTimer.Ch:
+			// NOTE: flushTimer.Set() must be called every time
+			// something is written to .bufConnWriter.
+			c.flush()
 		case <-c.send:
 			eof := c.sendSomePacketMsgs()
 			if !eof {
@@ -184,7 +182,7 @@ func (c *MConnection) sendRoutine() {
 
 func (c *MConnection) recvRoutine() {
 	defer c._recover()
-	reader := gobio.NewReader(c.bufConnReader)
+	reader := gobio.NewReader(c.conn)
 FOR_LOOP:
 	for {
 		var packet bean.PacketMsg
@@ -203,10 +201,6 @@ FOR_LOOP:
 			break FOR_LOOP
 		}
 
-		if err != nil {
-			fmt.Println("Connection failed1 @ recvRoutine", "conn", c, "err", err)
-			break FOR_LOOP
-		}
 		channel, ok := c.channelsIdx[byte(packet.ChannelID)]
 		if !ok || channel == nil {
 			err := fmt.Errorf("unknown channel %X", packet.ChannelID)

@@ -1,10 +1,9 @@
 package conn
 
 import (
-	"bytes"
-	"encoding/gob"
 	"fmt"
 	"github.com/w3liu/consensus/bean"
+	"github.com/w3liu/consensus/libs/gobio"
 	clmath "github.com/w3liu/consensus/libs/math"
 	"io"
 	"log"
@@ -119,13 +118,8 @@ func (ch *Channel) nextPacketMsg() bean.PacketMsg {
 
 func (ch *Channel) writePacketMsgTo(w io.Writer) (n int, err error) {
 	packet := ch.nextPacketMsg()
-	var buffer bytes.Buffer
-	enc := gob.NewEncoder(&buffer)
-	err = enc.Encode(packet)
-	if err != nil {
-		return 0, err
-	}
-	n, err = w.Write(buffer.Bytes())
+	writer := gobio.NewWriter(w)
+	n, err = writer.WriteMsg(&packet)
 	atomic.AddInt64(&ch.recentlySent, int64(n))
 	return
 }
