@@ -4,12 +4,12 @@ import (
 	"bytes"
 	"encoding/gob"
 	"fmt"
-	"github.com/w3liu/consensus/bean"
+	"github.com/w3liu/consensus/types"
 	"testing"
 )
 
 func TestEncode(t *testing.T) {
-	obj := bean.PacketMsg{
+	obj := types.PacketMsg{
 		ChannelID: 0x01,
 		EOF:       0x01,
 		Data:      []byte("hello gob"),
@@ -27,6 +27,7 @@ func TestEncode(t *testing.T) {
 	fmt.Println("len", len(buf.Bytes()))
 
 	var msg bean.PacketMsg
+	var msg types.PacketMsg
 
 	dec := gob.NewDecoder(&buf)
 

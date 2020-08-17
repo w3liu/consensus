@@ -4,8 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/gob"
-	"fmt"
-	"github.com/w3liu/consensus/bean"
+	"github.com/w3liu/consensus/types"
 	"io"
 )
 
@@ -27,8 +26,10 @@ type gobReader struct {
 	closer io.Closer
 }
 
-func (r *gobReader) ReadMsg(msg bean.Message) error {
+func (r *gobReader) ReadMsg(msg types.Message) error {
 	length64, err := binary.ReadUvarint(newByteReader(r.r))
+
+	n, err := r.r.Read(r.buf)
 	if err != nil {
 		return err
 	}
