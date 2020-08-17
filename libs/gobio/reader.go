@@ -2,7 +2,9 @@ package gobio
 
 import (
 	"bytes"
+	"encoding/binary"
 	"encoding/gob"
+	"fmt"
 	"github.com/w3liu/consensus/bean"
 	"io"
 )
@@ -14,7 +16,7 @@ func NewReader(r io.Reader) ReadCloser {
 	}
 	return &gobReader{
 		r:      r,
-		buf:    make([]byte, 1024),
+		buf:    make([]byte, 0),
 		closer: closer,
 	}
 }
@@ -26,11 +28,23 @@ type gobReader struct {
 }
 
 func (r *gobReader) ReadMsg(msg bean.Message) error {
-	n, err := r.r.Read(r.buf)
+	length64, err := binary.ReadUvarint(newByteReader(r.r))
 	if err != nil {
 		return err
 	}
-	dec := gob.NewDecoder(bytes.NewBuffer(r.buf[:n]))
+	length := int(length64)
+	if length < 0 {
+		return fmt.Errorf("message length is 0")
+	}
+
+	if len(r.buf) < length {
+		r.buf = make([]byte, length)
+	}
+	buf := r.buf[:length]
+	if _, err := io.ReadFull(r.r, buf); err != nil {
+		return err
+	}
+	dec := gob.NewDecoder(bytes.NewBuffer(buf))
 	return dec.Decode(msg)
 }
 

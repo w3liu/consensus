@@ -155,7 +155,8 @@ func (c *MConnection) sendPacketMsg() bool {
 		log.Println("writePacketMsgTo error", err.Error())
 		return true
 	}
-	c.flush()
+	//c.flush()
+	c.flushTimer.Set()
 	return false
 }
 

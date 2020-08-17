@@ -24,6 +24,8 @@ func TestEncode(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	fmt.Println("len", len(buf.Bytes()))
+
 	var msg bean.PacketMsg
 
 	dec := gob.NewDecoder(&buf)

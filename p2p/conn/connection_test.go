@@ -53,7 +53,7 @@ func TestMConnectionReceive(t *testing.T) {
 	msg := "hello"
 
 	go func() {
-		for i := 0; i < 100; i++ {
+		for i := 0; i < 1000; i++ {
 			txt := fmt.Sprintf("%s_%d", msg, i)
 			serverConn.Send(0x01, []byte(txt))
 		}

@@ -2,6 +2,7 @@ package gobio
 
 import (
 	"bytes"
+	"encoding/binary"
 	"encoding/gob"
 	"github.com/w3liu/consensus/bean"
 	"io"
@@ -15,24 +16,31 @@ func NewWriter(w io.Writer) WriteCloser {
 	}
 	return &gobWriter{
 		w:      w,
-		buf:    &buffer,
+		buffer: &buffer,
+		lenBuf: make([]byte, binary.MaxVarintLen64),
 		closer: closer,
 	}
 }
 
 type gobWriter struct {
 	w      io.Writer
-	buf    *bytes.Buffer
+	buffer *bytes.Buffer
+	lenBuf []byte
 	closer io.Closer
 }
 
 func (w *gobWriter) WriteMsg(msg bean.Message) (int, error) {
-	enc := gob.NewEncoder(w.buf)
+	enc := gob.NewEncoder(w.buffer)
 	if err := enc.Encode(msg); err != nil {
 		return 0, err
 	}
-	n, err := w.w.Write(w.buf.Bytes())
-	defer w.buf.Reset()
+	length := uint64(len(w.buffer.Bytes()))
+	n := binary.PutUvarint(w.lenBuf, length)
+	_, err := w.w.Write(w.lenBuf[:n])
+	if err != nil {
+		return 0, err
+	}
+	n, err = w.w.Write(w.buffer.Bytes())
 	return n, err
 }
 
