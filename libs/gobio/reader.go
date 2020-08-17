@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/gob"
+	"fmt"
 	"github.com/w3liu/consensus/types"
 	"io"
 )
@@ -28,8 +29,6 @@ type gobReader struct {
 
 func (r *gobReader) ReadMsg(msg types.Message) error {
 	length64, err := binary.ReadUvarint(newByteReader(r.r))
-
-	n, err := r.r.Read(r.buf)
 	if err != nil {
 		return err
 	}
