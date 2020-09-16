@@ -38,7 +38,8 @@ func (p *peer) Send(chID byte, msgBytes []byte) bool {
 	if !p.hasChannel(chID) {
 		return false
 	}
-	return true
+	res := p.mconn.Send(chID, msgBytes)
+	return res
 }
 
 func (p *peer) hasChannel(chID byte) bool {
