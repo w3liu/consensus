@@ -63,6 +63,7 @@ func TestListen(t *testing.T) {
 				}
 				fmt.Println(string(buf[:n]))
 			}
+			c.RemoteAddr()
 		}(c)
 	}
 }
