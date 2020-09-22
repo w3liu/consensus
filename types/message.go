@@ -9,6 +9,21 @@ type Message interface {
 	GetData() []byte
 }
 
+type NodeInfoMessage struct {
+	Id   string `json:"id"`
+	Ip   string `json:"ip"`
+	Port uint16 `json:"port"`
+}
+
+func (m *NodeInfoMessage) GetData() []byte {
+	data, err := json.Marshal(m)
+	if err != nil {
+		log.Println(err)
+		return []byte{}
+	}
+	return data
+}
+
 type ProposeMessage struct {
 	Height    int    `json:"height"`
 	Data      string `json:"data"`

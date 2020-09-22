@@ -199,6 +199,7 @@ FOR_LOOP:
 			} else {
 				log.Println("Connection failed @ recvRoutine (reading byte)", "conn", c, "err", err)
 			}
+			c.onError(err)
 			break FOR_LOOP
 		}
 

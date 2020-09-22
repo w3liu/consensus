@@ -3,6 +3,7 @@ package pbft
 import (
 	"fmt"
 	"github.com/w3liu/consensus/config"
+	"github.com/w3liu/consensus/libs/gobio"
 	"github.com/w3liu/consensus/p2p/conn"
 	"github.com/w3liu/consensus/types"
 	"log"
@@ -68,16 +69,14 @@ func (s *State) accept() {
 			continue
 		}
 		go func(c net.Conn) {
-			onReceive := func(chID byte, msgBytes []byte) {
-			}
-			onError := func(r interface{}) {
-			}
-			chDescs := []*conn.ChannelDescriptor{{ID: 0x01, Priority: 1, SendQueueCapacity: 1}}
-			server := conn.NewMConnection(c, chDescs, onReceive, onError)
-
-			err := server.OnStart()
+			server, err := s.wrapConn(c)
 			if err != nil {
-
+				fmt.Println("s.wrapConn(c) error", err)
+				return
+			}
+			err = server.OnStart()
+			if err != nil {
+				fmt.Println("server.OnStart()", err)
 				return
 			}
 
@@ -85,8 +84,90 @@ func (s *State) accept() {
 	}
 }
 
+func (s *State) dialPeers() {
+	for _, addr := range s.seeds {
+		if _, ok := s.mconn[addr.Id]; !ok {
+			c, err := s.dial(addr)
+			if err != nil {
+				fmt.Println("s.dial(addr) error", err)
+				continue
+			}
+			c.OnStart()
+		}
+	}
+}
+
+func (s *State) dial(addr *types.Address) (*conn.MConnection, error) {
+	c, err := net.DialTimeout("tcp", addr.ToIpPortString(), time.Second*3)
+	if err != nil {
+		return nil, err
+	}
+	return s.wrapConn(c)
+}
+
+func (s *State) wrapConn(c net.Conn) (*conn.MConnection, error) {
+	peer, err := s.handshake(c, time.Second*3, &types.NodeInfoMessage{
+		Id:   s.address.Id,
+		Ip:   s.address.Ip.String(),
+		Port: s.address.Port,
+	})
+	if err != nil {
+		fmt.Println("handshake error", err)
+		c.Close()
+		return nil, err
+	}
+	if _, ok := s.mconn[peer.Id]; ok {
+		fmt.Println("connection is existed")
+		c.Close()
+		return nil, err
+	}
+
+	onError := func(r interface{}) {
+		// 移除节点
+		if _, ok := s.mconn[peer.Id]; ok {
+			delete(s.mconn, peer.Id)
+		}
+		fmt.Println("onError", r)
+	}
+	chDescs := []*conn.ChannelDescriptor{{ID: 0x01, Priority: 1, SendQueueCapacity: 1}}
+	server := conn.NewMConnection(c, chDescs, s.ReceiveMsg, onError)
+	return server, nil
+}
+
+func (s *State) ReceiveMsg(chID byte, msgBytes []byte) {
+
+}
+
 func (s *State) CreateConn() {
 
+}
+
+func (s *State) handshake(c net.Conn, timeout time.Duration, nodeInfo *types.NodeInfoMessage) (*types.NodeInfoMessage, error) {
+	if err := c.SetDeadline(time.Now().Add(timeout)); err != nil {
+		return nil, err
+	}
+	var (
+		errc         = make(chan error, 2)
+		peerNodeInfo = &types.NodeInfoMessage{}
+		ourNodeInfo  = nodeInfo
+	)
+	go func(errc chan<- error, c net.Conn) {
+		_, err := gobio.NewWriter(c).WriteMsg(ourNodeInfo)
+		errc <- err
+	}(errc, c)
+
+	go func(errc chan<- error, c net.Conn) {
+		err := gobio.NewReader(c).ReadMsg(peerNodeInfo)
+		errc <- err
+	}(errc, c)
+
+	for i := 0; i < cap(errc); i++ {
+		err := <-errc
+		if err != nil {
+			return nil, err
+		}
+	}
+	return peerNodeInfo, c.SetDeadline(time.Time{})
 }
 
 func (s *State) Propose() {
