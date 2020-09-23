@@ -2,11 +2,24 @@ package types
 
 import (
 	"encoding/json"
-	"log"
+	"github.com/w3liu/consensus/log"
+	"go.uber.org/zap"
+)
+
+const (
+	Pending = iota
+	Propose
+	Vote
+	PreCommit
+	Commit
 )
 
 type Message interface {
 	GetData() []byte
+}
+
+type Serializable interface {
+	Serialize() []byte
 }
 
 type NodeInfoMessage struct {
@@ -18,10 +31,43 @@ type NodeInfoMessage struct {
 func (m *NodeInfoMessage) GetData() []byte {
 	data, err := json.Marshal(m)
 	if err != nil {
-		log.Println(err)
+		log.Error("json.Marshal", zap.Error(err))
 		return []byte{}
 	}
 	return data
+}
+
+type MessageInfo struct {
+	MsgType    int    `json:"msgType"`
+	MsgContent string `json:"msgContent"`
+}
+
+func (m *MessageInfo) GetData() []byte {
+	data, err := json.Marshal(m)
+	if err != nil {
+		log.Error("json.Marshal", zap.Error(err))
+		return []byte{}
+	}
+	return data
+}
+
+func NewMessageInfo(o Serializable) *MessageInfo {
+	msgInfo := &MessageInfo{
+		MsgContent: string(o.Serialize()),
+	}
+	switch interface{}(o).(type) {
+	case *ProposeMessage:
+		msgInfo.MsgType = Propose
+	case *VoteMessage:
+		msgInfo.MsgType = Vote
+	case *PreCommitMessage:
+		msgInfo.MsgType = PreCommit
+	case *CommitMessage:
+		msgInfo.MsgType = Commit
+	default:
+
+	}
+	return msgInfo
 }
 
 type ProposeMessage struct {
@@ -31,10 +77,10 @@ type ProposeMessage struct {
 	Signer    string `json:"signer"`
 }
 
-func (m *ProposeMessage) GetData() []byte {
+func (m *ProposeMessage) Serialize() []byte {
 	data, err := json.Marshal(m)
 	if err != nil {
-		log.Println(err)
+		log.Error("json.Marshal", zap.Error(err))
 		return []byte{}
 	}
 	return data
@@ -45,10 +91,10 @@ type VoteMessage struct {
 	Validator string `json:"validator"`
 }
 
-func (m *VoteMessage) GetData() []byte {
+func (m *VoteMessage) Serialize() []byte {
 	data, err := json.Marshal(m)
 	if err != nil {
-		log.Println(err)
+		log.Error("json.Marshal", zap.Error(err))
 		return []byte{}
 	}
 	return data
@@ -59,10 +105,10 @@ type PreCommitMessage struct {
 	Validator string `json:"validator"`
 }
 
-func (m *PreCommitMessage) GetData() []byte {
+func (m *PreCommitMessage) Serialize() []byte {
 	data, err := json.Marshal(m)
 	if err != nil {
-		log.Println(err)
+		log.Error("json.Marshal", zap.Error(err))
 		return []byte{}
 	}
 	return data
@@ -73,10 +119,10 @@ type CommitMessage struct {
 	Validator string `json:"validator"`
 }
 
-func (m *CommitMessage) GetData() []byte {
+func (m *CommitMessage) Serialize() []byte {
 	data, err := json.Marshal(m)
 	if err != nil {
-		log.Println(err)
+		log.Error("json.Marshal", zap.Error(err))
 		return []byte{}
 	}
 	return data

@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"github.com/w3liu/consensus/libs/gobio"
 	"github.com/w3liu/consensus/libs/timer"
+	"github.com/w3liu/consensus/log"
 	"github.com/w3liu/consensus/types"
+	"go.uber.org/zap"
 	"io"
-	"log"
 	"net"
 	"runtime/debug"
 	"sync"
@@ -84,7 +85,7 @@ func (c *MConnection) OnStop() {
 func (c *MConnection) flush() {
 	err := c.bufConnWriter.Flush()
 	if err != nil {
-		log.Println("MConnection flush failed", "err", err)
+		log.Error("MConnection flush failed", zap.Error(err))
 	}
 }
 
@@ -122,7 +123,7 @@ func (c *MConnection) Send(chID byte, msgBytes []byte) bool {
 		default:
 		}
 	} else {
-		log.Println("Send failed", "channel", chID, "conn", c, "msgBytes", fmt.Sprintf("%X", msgBytes))
+		log.Info("Send failed", zap.Any("channel", chID), zap.Any("conn", c), zap.Any("msgBytes", fmt.Sprintf("%X", msgBytes)))
 	}
 	return success
 }
@@ -152,7 +153,7 @@ func (c *MConnection) sendPacketMsg() bool {
 	// c.Logger.Info("Found a msgPacket to send")
 	_, err := leastChannel.writePacketMsgTo(c.bufConnWriter)
 	if err != nil {
-		log.Println("writePacketMsgTo error", err.Error())
+		log.Error("writePacketMsgTo error", zap.Error(err))
 		return true
 	}
 	//c.flush()
@@ -195,9 +196,9 @@ FOR_LOOP:
 			default:
 			}
 			if err == io.EOF {
-				log.Println("Connection is closed @ recvRoutine (likely by the other side)", "conn", c)
+				log.Info("Connection is closed @ recvRoutine (likely by the other side)", zap.Any("conn", c))
 			} else {
-				log.Println("Connection failed @ recvRoutine (reading byte)", "conn", c, "err", err)
+				log.Error("Connection failed @ recvRoutine (reading byte)", zap.Any("conn", c), zap.Error(err))
 			}
 			c.onError(err)
 			break FOR_LOOP
@@ -206,17 +207,16 @@ FOR_LOOP:
 		channel, ok := c.channelsIdx[byte(packet.ChannelID)]
 		if !ok || channel == nil {
 			err := fmt.Errorf("unknown channel %X", packet.ChannelID)
-			log.Println("Connection failed2 @ recvRoutine", "conn", c, "err", err)
+			log.Error("Connection failed2 @ recvRoutine", zap.Any("conn", c), zap.Error(err))
 			break FOR_LOOP
 		}
 
 		msgBytes, err := channel.recvPacketMsg(packet)
 		if err != nil {
-			log.Println("Connection failed3 @ recvRoutine", "conn", c, "err", err)
+			log.Info("Connection failed3 @ recvRoutine", zap.Any("conn", c), zap.Error(err))
 			break FOR_LOOP
 		}
 		if msgBytes != nil {
-			log.Println("Received bytes", "chID", packet.ChannelID, "msgBytes", fmt.Sprintf("%X", msgBytes))
 			// NOTE: This means the reactor.Receive runs in the same thread as the p2p recv routine
 			c.onReceive(byte(packet.ChannelID), msgBytes)
 		}
@@ -225,6 +225,6 @@ FOR_LOOP:
 
 func (c *MConnection) _recover() {
 	if r := recover(); r != nil {
-		log.Println("MConnection panicked", "err", r, "stack", string(debug.Stack()))
+		log.Error("MConnection panicked", zap.Any("err", r), zap.Any("stack", string(debug.Stack())))
 	}
 }
