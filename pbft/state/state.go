@@ -163,7 +163,7 @@ func (s *State) wrapConn(c net.Conn) (*conn.MConnection, error) {
 }
 
 func (s *State) ReceiveMsg(chID byte, msgBytes []byte) {
-	log.Info("ReceiveMsg:", zap.Any("chID", chID), zap.String("msg", string(msgBytes)))
+	//log.Info("ReceiveMsg:", zap.Any("chID", chID), zap.String("msg", string(msgBytes)))
 	msgInfo := &types.MessageInfo{}
 	err := json.Unmarshal(msgBytes, msgInfo)
 	if err != nil {
@@ -230,87 +230,93 @@ func (s *State) Propose() {
 }
 
 func (s *State) Vote() {
-	if s.step == types.Pending {
-		msg := &types.VoteMessage{
-			Height:    s.currentBlock.Height,
-			Validator: s.address.Id,
-		}
-		for _, c := range s.mconn {
-			if b := c.Send(0x1, types.NewMessageInfo(msg).GetData()); !b {
-				log.Error("send msg failed")
-				return
-			}
-		}
-		s.step = types.Vote
+	msg := &types.VoteMessage{
+		Height:    s.currentBlock.Height,
+		Validator: s.address.Id,
 	}
+	for _, c := range s.mconn {
+		if b := c.Send(0x1, types.NewMessageInfo(msg).GetData()); !b {
+			log.Error("send msg failed")
+			return
+		}
+	}
+	s.step = types.Vote
 }
 
 func (s *State) PreCommit() {
-	if s.step == types.Vote {
-		msg := &types.PreCommitMessage{
-			Height:    s.currentBlock.Height,
-			Validator: s.address.Id,
-		}
-		for _, c := range s.mconn {
-			if b := c.Send(0x1, types.NewMessageInfo(msg).GetData()); !b {
-				log.Error("send msg failed")
-				return
-			}
-		}
-		s.step = types.PreCommit
+	msg := &types.PreCommitMessage{
+		Height:    s.currentBlock.Height,
+		Validator: s.address.Id,
 	}
-
+	for _, c := range s.mconn {
+		if b := c.Send(0x1, types.NewMessageInfo(msg).GetData()); !b {
+			log.Error("send msg failed")
+			return
+		}
+	}
+	s.step = types.PreCommit
 }
 
 func (s *State) Commit() {
-	if s.step == types.PreCommit {
-		s.lastBlock = s.currentBlock
-		s.currentBlock = Block{}
-		s.step = types.Pending
-		log.Info("block commit", zap.Any("height", s.lastBlock.Height), zap.Any("data", s.lastBlock.Data))
+	log.Info("block commit", zap.Any("height", s.currentBlock.Height), zap.Any("data", s.currentBlock.Data))
+	s.lastBlock = s.currentBlock
+	s.currentBlock = Block{}
+	for k, _ := range s.voteCache {
+		delete(s.voteCache, k)
 	}
+	for k, _ := range s.preCommitCache {
+		delete(s.preCommitCache, k)
+	}
+	s.step = types.Pending
 }
 
 func (s *State) ReceivePropose(o *types.ProposeMessage) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
-	s.currentBlock = Block{
-		Height: o.Height,
-		Data:   o.Data,
-	}
-	if s.checkBlock() {
-		s.Vote()
-	} else {
-		s.currentBlock = s.lastBlock
+	if s.step == types.Pending {
+		s.currentBlock = Block{
+			Height: o.Height,
+			Data:   o.Data,
+		}
+		if s.checkBlock() {
+			s.Vote()
+		} else {
+			s.currentBlock = s.lastBlock
+		}
 	}
 }
 
 func (s *State) ReceiveVote(o *types.VoteMessage) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
-	if _, ok := s.voteCache[o.Validator]; !ok {
-		s.voteCache[o.Validator] = o
-	}
-	var voteCnt int
-	if s.isProposer() {
-		voteCnt = len(s.voteCache) + 1
-	} else {
-		voteCnt = len(s.voteCache) + 2
-	}
-	if s.checkMajor23(voteCnt) {
-		s.PreCommit()
+	if s.step <= types.Vote {
+		if _, ok := s.voteCache[o.Validator]; !ok {
+			s.voteCache[o.Validator] = o
+		}
+		var voteCnt int
+		if s.isProposer() {
+			voteCnt = len(s.voteCache) + 1
+			s.step = types.Vote
+		} else {
+			voteCnt = len(s.voteCache) + 2
+		}
+		if s.checkMajor23(voteCnt) {
+			s.PreCommit()
+		}
 	}
 }
 
 func (s *State) ReceivePreCommit(o *types.PreCommitMessage) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
-	if _, ok := s.preCommitCache[o.Validator]; !ok {
-		s.preCommitCache[o.Validator] = o
-	}
-	var pCnt = len(s.preCommitCache) + 1
-	if s.checkMajor23(pCnt) {
-		s.Commit()
+	if s.step == types.PreCommit {
+		if _, ok := s.preCommitCache[o.Validator]; !ok {
+			s.preCommitCache[o.Validator] = o
+		}
+		var pCnt = len(s.preCommitCache) + 1
+		if s.checkMajor23(pCnt) {
+			s.Commit()
+		}
 	}
 }
 
