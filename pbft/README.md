@@ -13,6 +13,7 @@
 
 ## 编译
 ```
+make clean
 make
 ```
 
