@@ -79,6 +79,7 @@ func (s *State) Start() {
 		}
 	}
 }
+
 func (s *State) Stop() {
 }
 
