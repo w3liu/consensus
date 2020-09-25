@@ -19,7 +19,6 @@ type State struct {
 	proposer       *types.Address
 	validators     []*types.Address
 	mconn          map[string]*conn.MConnection
-	dialTicker     *time.Ticker
 	blockTicker    *time.Ticker // 用于定时出块
 	lastBlock      Block
 	currentBlock   Block
@@ -58,8 +57,7 @@ func NewState(cfg *config.Config) *State {
 		address:        address,
 		validators:     seeds,
 		mconn:          make(map[string]*conn.MConnection),
-		dialTicker:     time.NewTicker(time.Second * 10),
-		blockTicker:    time.NewTicker(time.Second * 10),
+		blockTicker:    time.NewTicker(time.Second * 1),
 		voteCache:      make(map[string]*types.VoteMessage),
 		preCommitCache: make(map[string]*types.PreCommitMessage),
 	}
@@ -208,6 +206,9 @@ func (s *State) Propose() {
 			Data:   fmt.Sprintf("This is a block data, height is %d.", currHeight),
 		}
 	} else {
+		if s.isProposer() {
+			log.Warn("Propose", zap.Any("step", s.step))
+		}
 		return
 	}
 
@@ -227,7 +228,7 @@ func (s *State) Propose() {
 			return
 		}
 	}
-	s.step = types.Propose
+	s.step = types.Vote
 }
 
 func (s *State) Vote() {
@@ -297,7 +298,6 @@ func (s *State) ReceiveVote(o *types.VoteMessage) {
 		var voteCnt int
 		if s.isProposer() {
 			voteCnt = len(s.voteCache) + 1
-			s.step = types.Vote
 		} else {
 			voteCnt = len(s.voteCache) + 2
 		}
