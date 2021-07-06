@@ -23,4 +23,4 @@ go build
 ```
 
 ## 效果
-[!qr](./docs/images/pbft.png)
+![image](./docs/images/pbft.png)
